@@ -5,3 +5,4 @@ paper/*.bbl
 paper/*.blg
 paper/*.out
 paper/*.vtc
+figures/*.pdf

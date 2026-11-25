@@ -8,6 +8,14 @@ $$R = r + d$$
 If a rounded rectangle with corner radius $r$ sits inside another rounded rectangle with a uniform
 gap $d$ on every side, the outer corner radius $R$ must be $r + d$. No other radius works.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="figures/nested-dark.svg">
+  <img alt="Two nested rounded rectangles. Left: the outer radius is r + d and the gap is uniform. Right: both radii are r and the gap at the corner is d times the square root of 2." src="figures/nested-light.svg">
+</picture>
+
+*(a) With $R = r + d$, both corner arcs share a centre and the gap is $d$ everywhere.
+(b) With equal radii, the gap along the corner diagonal grows to $d\sqrt{2}$.*
+
 The accompanying paper is [`paper/radius.pdf`](paper/radius.pdf). It is typeset with the
 LIPIcs class (`lipics-v2021.cls`, distributed under the LPPL), which is included in `paper/`.
 
@@ -50,11 +58,14 @@ lake build
 lake env lean AxiomCheck.lean
 ```
 
-To rebuild the paper (requires [Tectonic](https://tectonic-typesetting.github.io)):
+To rebuild the paper and the README figures (requires [Tectonic](https://tectonic-typesetting.github.io)):
 
 ```sh
 cd paper && tectonic radius.tex
+cd ../figures && tectonic nested-light.tex && tectonic nested-dark.tex
 ```
+
+The figures are converted from PDF to SVG with PyMuPDF (`page.get_svg_image()`).
 
 ## Citation
 
