@@ -1,6 +1,7 @@
 /-
 Copyright (c) 2026 Steve Ruiz. All rights reserved.
 Released under the MIT license as described in the file LICENSE.
+Authors: Steve Ruiz
 -/
 import RadiusProof.Offset
 import RadiusProof.Uniqueness
