@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this formalization, please cite it as below."
+title: "On the Corner Radii of Nested Rounded Rectangles: A Machine-Checked Proof of R = r + d"
+authors:
+  - family-names: Ruiz
+    given-names: Steve
+    affiliation: tldraw
+type: software
+license: MIT
+repository-code: "https://github.com/steveruizok/radius-proof"
+date-released: 2026-11-25
+version: 1.0.0
+keywords:
+  - Lean 4
+  - Mathlib
+  - formal verification
+  - Minkowski sum
+  - rounded rectangle

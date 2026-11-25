@@ -8,7 +8,8 @@ $$R = r + d$$
 If a rounded rectangle with corner radius $r$ sits inside another rounded rectangle with a uniform
 gap $d$ on every side, the outer corner radius $R$ must be $r + d$. No other radius works.
 
-The accompanying paper is [`paper/radius.pdf`](paper/radius.pdf).
+The accompanying paper is [`paper/radius.pdf`](paper/radius.pdf). It is typeset with the
+LIPIcs class (`lipics-v2021.cls`, distributed under the LPPL), which is included in `paper/`.
 
 ## Statement
 
@@ -55,6 +56,11 @@ To rebuild the paper (requires [Tectonic](https://tectonic-typesetting.github.io
 cd paper && tectonic radius.tex
 ```
 
+## Citation
+
+See [`CITATION.cff`](CITATION.cff).
+
 ## License
 
-MIT.
+The Lean development and the paper are released under the MIT license. The LIPIcs class files in
+`paper/` are distributed under their own license (LPPL 1.3c).

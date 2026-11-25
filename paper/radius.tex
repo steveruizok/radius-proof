@@ -1,32 +1,50 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[a4paper,UKenglish,cleveref,autoref,thm-restate]{lipics-v2021}
 
-\usepackage{fontspec}
-\setmonofont{DejaVuSansMono.ttf}[Scale=0.85,BoldFont=DejaVuSansMono-Bold.ttf,ItalicFont=DejaVuSansMono-Oblique.ttf]
-\usepackage{amsmath,amssymb,amsthm}
+\hideLIPIcs
+\nolinenumbers
+
 \usepackage{mathtools}
-\usepackage[margin=1.15in]{geometry}
-\usepackage{microtype}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,calc,decorations.pathreplacing}
 \usepackage{listings}
-\usepackage{xcolor}
-\usepackage[numbers,sort&compress]{natbib}
-\usepackage[hidelinks]{hyperref}
-\usepackage{url}
-\usepackage{caption}
+\usepackage{fontspec}
+\newfontfamily\leanfont{DejaVuSansMono.ttf}[Scale=0.85,BoldFont=DejaVuSansMono-Bold.ttf,ItalicFont=DejaVuSansMono-Oblique.ttf]
 
+\bibliographystyle{plainurl}
+
+\title{On the Corner Radii of Nested Rounded Rectangles: A Machine-Checked Proof of $R = r + d$}
+\titlerunning{On the Corner Radii of Nested Rounded Rectangles}
+
+\author{Steve Ruiz}{tldraw, London, United Kingdom}{}{}{}
+
+\authorrunning{S. Ruiz}
+
+\Copyright{Steve Ruiz}
+
+\ccsdesc[500]{Theory of computation~Logic and verification}
+\ccsdesc[300]{Computing methodologies~Shape modeling}
+\ccsdesc[100]{Human-centered computing~User interface design}
+
+\keywords{Lean 4, Mathlib, formal verification, Minkowski sum, parallel body, rounded rectangle,
+user interface design}
+
+\supplementdetails[subcategory={Lean Source}, linktext={github.com/steveruizok/radius-proof}]{Software}{https://github.com/steveruizok/radius-proof/tree/5136a156409b90da1b27c4924ef8911a01d4a52d}
+
+\acknowledgements{The formalization was prepared with the assistance of Claude (Anthropic). The
+author thanks the Mathlib community for the library on which this development is built.}
+
+% Lean listings ---------------------------------------------------------------
 \definecolor{leankw}{HTML}{1F4E9E}
 \definecolor{leancomment}{HTML}{5B6B5B}
 \lstdefinelanguage{lean}{
   morekeywords={theorem,def,structure,where,by,fun,open,namespace,end,noncomputable,section,
-    variable,import,rintro,exact,rw,constructor,refine,obtain,have,simp,linarith,rfl,example},
+    variable,import,example,Prop,Set},
   sensitive=true,
   morecomment=[l]{--},
   morecomment=[s]{/-}{-/},
 }
 \lstset{
   language=lean,
-  basicstyle=\ttfamily\small,
+  basicstyle=\leanfont\small,
   keywordstyle=\color{leankw}\bfseries,
   commentstyle=\color{leancomment}\itshape,
   columns=fullflexible,
@@ -39,16 +57,7 @@
   belowskip=1em,
 }
 
-\newtheorem{theorem}{Theorem}
-\newtheorem{proposition}[theorem]{Proposition}
-\newtheorem{lemma}[theorem]{Lemma}
-\newtheorem{corollary}[theorem]{Corollary}
-\theoremstyle{definition}
-\newtheorem{definition}[theorem]{Definition}
-\theoremstyle{remark}
-\newtheorem{remark}[theorem]{Remark}
-\newtheorem{example}[theorem]{Example}
-
+% Notation --------------------------------------------------------------------
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\C}{\mathbb{C}}
 \newcommand{\Disc}{\mathbb{D}}
@@ -57,79 +66,75 @@
 \newcommand{\abs}[1]{\left\lvert #1 \right\rvert}
 \newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
 \DeclareMathOperator{\dist}{dist}
-\DeclareMathOperator{\Re_}{Re}
-\DeclareMathOperator{\Im_}{Im}
-
-\title{\textbf{On the Corner Radii of Nested Rounded Rectangles}\\[0.4em]
-\large A Machine-Checked Proof of the Law $R = r + d$}
-\author{Steve Ruiz}
-\date{November 2026}
+\DeclareMathOperator{\ReOp}{Re}
+\DeclareMathOperator{\ImOp}{Im}
+\newcommand{\lean}[1]{{\leanfont #1}}
 
 \begin{document}
+
 \maketitle
 
 \begin{abstract}
 When a rounded rectangle of corner radius $r$ is placed inside a larger rounded rectangle with a
-uniform gap of width $d$ on all sides, the outer corner radius must be $R = r + d$. This
-relation is known to every practitioner of graphical user-interface design, is encoded in the
-corner-shaping rules of the CSS Backgrounds and Borders specification, and is violated with some
-regularity in production software. We give a precise statement of the law in the Euclidean plane,
-prove that the closed $d$-neighbourhood of a rounded rectangle of radius $r$ is a rounded
-rectangle of radius $r + d$, and prove that no other radius produces a uniform gap. We further
-show that the common practice of assigning both shapes the same radius yields a uniform gap only
-in the degenerate case $d = 0$, and that an outer radius smaller than the gap is not realisable by
-any inner shape. All results are formalized in the Lean~4 theorem prover against the Mathlib
+uniform gap of width $d$ on all sides, the outer corner radius must be $R = r + d$. The relation is
+standard guidance in graphical user-interface design and is encoded in the corner-shaping rules of
+the CSS Backgrounds and Borders specification. We give a precise statement of the relation in the
+Euclidean plane, prove that the closed $d$-neighbourhood of a rounded rectangle of radius $r$ is a
+rounded rectangle of radius $r + d$, and prove that no other radius produces a uniform gap. We
+further show that assigning both shapes the same radius yields a uniform gap only when $d = 0$,
+and that an outer radius smaller than the gap is not realised by any inner shape. All results
+except one quantitative proposition are formalized in the Lean~4 theorem prover using the Mathlib
 library, and depend on no axioms beyond the three standard ones.
 \end{abstract}
 
-\section{Introduction}
+\section{Introduction}\label{sec:intro}
 
-Consider a card with rounded corners resting inside a container, also with rounded corners,
-separated from it by a constant padding $d$. A recurring question in interface design is which
-corner radius to give the container. Two answers are in circulation. The first assigns the same
-radius to both shapes. The second, which we shall call the \emph{nested radius law}, prescribes
+Consider a card with rounded corners inside a container, also with rounded corners, separated from
+it by a constant padding $d$. Which corner radius should the container have? Practitioner guidance
+on this question is consistent~\cite{hebert2022,coyier2024}: the outer radius should be the inner
+radius plus the padding,
 \begin{equation}\label{eq:law}
-  R = r + d,
+  R = r + d .
 \end{equation}
-where $r$ is the radius of the inner shape and $R$ that of the outer. The visual consequence of the
-first answer is familiar: the gap between the two shapes, constant along the straight edges,
-swells at the corners (Figure~\ref{fig:nested}).
+We call \eqref{eq:law} the \emph{nested radius law}. A common alternative assigns the same radius
+to both shapes. Its visual consequence is familiar: the gap between the two shapes, constant along
+the straight edges, widens at the corners (\Cref{fig:nested}).
 
-The law \eqref{eq:law} is a special case of a classical fact about parallel bodies: the outer
-parallel body at distance $d$ of the outer parallel body at distance $r$ of a set $K$ is the outer
-parallel body at distance $r + d$ of $K$~\citep{steiner1840,minkowski1903,hadwiger1957,schneider2014}.
-In the language of mathematical morphology, dilation by a disc of radius $r$ followed by dilation
-by a disc of radius $d$ is dilation by a disc of radius $r +
-d$~\citep{matheron1975,serra1982}. The same observation underlies offsetting in solid modelling and
-the theory of offset curves~\citep{rossignac1986,maekawa1999}. In the web platform, the CSS
-Backgrounds and Borders specification states the inverse form of the law: the radius of the
-padding edge is the radius of the border edge less the border width, clamped at
-zero~\citep{css3backgrounds}.
+The law is a special case of a classical fact about parallel bodies. The outer parallel body at
+distance $d$ of the outer parallel body at distance $r$ of a set $K$ is the outer parallel body at
+distance $r + d$ of $K$~\cite{steiner1840,minkowski1903,hadwiger1957,schneider2014}. In the
+language of mathematical morphology, dilation by a disc of radius $r$ followed by dilation by a disc
+of radius $d$ is dilation by a disc of radius $r + d$~\cite{matheron1975,serra1982}. The same
+observation underlies offsetting in solid modelling and the theory of offset
+curves~\cite{rossignac1986,maekawa1999}. On the web platform, the CSS Backgrounds and Borders
+specification states the law in inverse form: the radius of the padding edge is the radius of the
+border edge minus the border width, and the radius of the content edge is the radius of the padding
+edge minus the padding, each clamped at zero~\cite{css3backgrounds}. A proposal before the CSS
+Working Group would add a keyword that computes nested radii automatically~\cite{argyle2022}.
 
-Despite this pedigree, we are not aware of a machine-checked proof. Recent years have seen
-proof assistants, often with the help of large language models, applied to problems of
-considerable depth. The present work addresses a problem of considerably less depth, in the
-belief that a result consulted this often deserves the same standard of rigour. Our contributions
-are:
+The classical results establish that $r + d$ \emph{suffices}. The question of whether it is
+\emph{necessary}, that is, whether some other radius could also yield a uniform gap, is not
+usually stated, since it reduces to the fact that a rounded rectangle determines its own
+parameters. We state and prove both directions and check the proofs mechanically.
+
+\subparagraph*{Contributions.}
 \begin{enumerate}
-  \item a precise definition of the rounded rectangle and of the \emph{uniform gap} relation
-        between two planar sets (Section~\ref{sec:defs});
-  \item a proof that the uniform-gap outer shape of a rounded rectangle exists, is a rounded
-        rectangle, and has radius $r + d$ (Theorem~\ref{thm:offset});
-  \item a proof that a rounded rectangle determines its parameters, from which it follows that
-        $r + d$ is the \emph{only} admissible outer radius (Theorems~\ref{thm:inj}
-        and~\ref{thm:main});
-  \item corollaries addressing the equal-radius practice and the case $R < d$
-        (Section~\ref{sec:corollaries}); and
-  \item a complete formalization in Lean~4~\citep{lean4} using Mathlib~\citep{mathlib2020}
-        (Section~\ref{sec:lean}).
+  \item A precise definition of the rounded rectangle and of the \emph{uniform gap} relation
+        between two planar sets (\Cref{sec:defs}).
+  \item A proof that the uniform-gap outer shape of a rounded rectangle is a rounded rectangle of
+        radius $r + d$ (\Cref{thm:offset}).
+  \item A proof that a rounded rectangle determines its parameters, from which $r + d$ is the
+        only admissible outer radius (\Cref{thm:inj,thm:main}).
+  \item Corollaries on the equal-radius practice and the case $R < d$ (\Cref{sec:corollaries}),
+        and a quantitative bound on the corner gap under equal radii (\Cref{prop:swell}).
+  \item A formalization of all of the above except \Cref{prop:swell} in Lean~4~\cite{lean4} using
+        Mathlib~\cite{mathlib2020} (\Cref{sec:lean}).
 \end{enumerate}
 
 \begin{figure}[t]
 \centering
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}
-  % Left panel: correct
   \begin{scope}
     \fill[black!6, rounded corners=1.1cm] (-3.5,-2.5) rectangle (3.5,2.5);
     \draw[thick, rounded corners=1.1cm] (-3.5,-2.5) rectangle (3.5,2.5);
@@ -140,10 +145,9 @@ are:
       node[midway, above left=-1pt, font=\scriptsize] {$r$};
     \draw[thin, densely dotted] (2.824,1.824) -- (3.178,2.178)
       node[midway, above left=-1pt, font=\scriptsize] {$d$};
-    \node[font=\small] at (0,-3.05) {$R = r + d$: uniform gap};
     \draw[|-|, thin] (3.0,0) -- (3.5,0) node[midway, above, font=\scriptsize] {$d$};
+    \node[font=\small] at (0,-3.05) {(a) $R = r + d$};
   \end{scope}
-  % Right panel: equal radii
   \begin{scope}[xshift=8.2cm]
     \fill[black!6, rounded corners=0.6cm] (-3.5,-2.5) rectangle (3.5,2.5);
     \draw[thick, rounded corners=0.6cm] (-3.5,-2.5) rectangle (3.5,2.5);
@@ -152,23 +156,49 @@ are:
     \draw[|-|, thin] (3.0,0) -- (3.5,0) node[midway, above, font=\scriptsize] {$d$};
     \draw[|-|, thin] (2.824,1.824) -- (3.324,2.324)
       node[midway, above left=-1pt, font=\scriptsize] {$d\sqrt2$};
-    \node[font=\small] at (0,-3.05) {$R = r$: the gap swells at the corners};
+    \node[font=\small] at (0,-3.05) {(b) $R = r$};
   \end{scope}
 \end{tikzpicture}%
 }
-\caption{Left: an inner rounded rectangle of radius $r$ and the outer rounded rectangle of radius
-$r + d$ (Theorem~\ref{thm:offset}). Both top-right corner arcs share the marked centre, and their
-radii differ by $d$. Right: with equal radii, the gap measured along the
-diagonal at each corner is $d\sqrt{2}$ rather than $d$ (Proposition~\ref{prop:swell}).}
+\caption{(a) An inner rounded rectangle of radius $r$ and the outer rounded rectangle of radius
+$r + d$ (\Cref{thm:offset}). The two top-right corner arcs share the marked centre. (b) With equal
+radii, the gap measured along the corner diagonal is $d\sqrt{2}$ rather than $d$
+(\Cref{prop:swell}).}
 \label{fig:nested}
 \end{figure}
 
+\section{Related Work}\label{sec:related}
+
+\subparagraph*{Parallel bodies and Minkowski sums.} The outer parallel body of a convex body and
+its volume, the subject of the Steiner formula, go back to Steiner~\cite{steiner1840} and
+Minkowski~\cite{minkowski1903}; standard modern treatments are those of
+Hadwiger~\cite{hadwiger1957} and Schneider~\cite{schneider2014}. Federer extended the theory of
+parallel sets beyond convexity to sets of positive reach~\cite{federer1959}. In mathematical
+morphology, the corresponding operation is dilation by a structuring
+element~\cite{matheron1975,serra1982}. In geometric modelling, offsets of curves and solids are
+surveyed by Rossignac and Requicha~\cite{rossignac1986} and by Maekawa~\cite{maekawa1999}.
+
+\subparagraph*{Formal Euclidean geometry.} Harrison's HOL Light library of Euclidean
+space~\cite{harrison2013} supplied the analytic geometry for the Flyspeck formal proof of the
+Kepler conjecture~\cite{hales2017}. GeoCoq formalizes the foundations of plane geometry in Coq,
+including the arithmetization of Euclidean plane geometry~\cite{boutry2019}. Mathlib provides
+metric thickenings (\lean{Metric.thickening}, \lean{Metric.cthickening}), pointwise Minkowski
+addition of sets, and, for normed real vector spaces, the composition law
+\lean{cthickening\_cthickening} for closed thickenings. That lemma implies the existence half of
+our main theorem in a more general setting. We are not aware of a formal treatment of rounded
+rectangles or of the uniqueness direction.
+
+\subparagraph*{Design practice.} The nested radius law appears throughout practitioner
+writing~\cite{hebert2022,coyier2024}, in the CSS specification~\cite{css3backgrounds}, and in a
+proposal to automate it in CSS~\cite{argyle2022}. These sources state the law without proof, or
+justify it by a picture of concentric arcs.
+
 \section{Definitions}\label{sec:defs}
 
-We identify the Euclidean plane with $\C$, writing $z = x + iy$ and
-$\norm{z} = \sqrt{x^2 + y^2}$. For $A, B \subseteq \C$ the \emph{Minkowski sum} is
-$A + B = \{a + b : a \in A,\ b \in B\}$. We write $\Disc_\rho = \{z : \norm{z} \le \rho\}$ for the
-closed disc of radius $\rho \ge 0$ about the origin, and, for $S \subseteq \C$ and $d \ge 0$,
+We identify the Euclidean plane with $\C$, writing $z = x + iy$ and $\norm{z} = \sqrt{x^2 + y^2}$.
+For $A, B \subseteq \C$ the \emph{Minkowski sum} is $A + B = \{a + b : a \in A,\ b \in B\}$. We
+write $\Disc_\rho = \{z : \norm{z} \le \rho\}$ for the closed disc of radius $\rho \ge 0$ about the
+origin and, for $S \subseteq \C$ and $d \ge 0$,
 \[
   S^{(d)} = \{ z \in \C : \dist(z, S) \le d \}
 \]
@@ -178,7 +208,7 @@ $\dist(z, S) = \inf_{s \in S} \norm{z - s}$.
 \begin{definition}[Rounded rectangle]\label{def:rr}
 Let $a, b, r \in \R$. The \emph{core} with parameters $(a, b, r)$ is the closed rectangle
 \[
-  \Core(a, b, r) = \{ z \in \C : \abs{\Re_ z} \le a - r,\ \abs{\Im_ z} \le b - r \},
+  \Core(a, b, r) = \{ z \in \C : \abs{\ReOp z} \le a - r,\ \abs{\ImOp z} \le b - r \},
 \]
 and the \emph{rounded rectangle} with half-width $a$, half-height $b$ and corner radius $r$ is
 \[
@@ -187,24 +217,15 @@ and the \emph{rounded rectangle} with half-width $a$, half-height $b$ and corner
 The parameters are \emph{admissible} if $0 \le r \le \min(a, b)$.
 \end{definition}
 
-For admissible parameters, $\RR(a, b, r)$ is the familiar shape: its bounding box is
-$[-a, a] \times [-b, b]$, its edges are straight, and its four corners are circular arcs of
-radius $r$ centred at the vertices $(\pm(a - r), \pm(b - r))$ of the core. The cases $r = 0$
-(a rectangle) and $r = a = b$ (a disc) are included.
+For admissible parameters, $\RR(a, b, r)$ is the familiar shape. Its bounding box is
+$[-a, a] \times [-b, b]$, its edges are straight, and its four corners are circular arcs of radius
+$r$ centred at the vertices $(\pm(a - r), \pm(b - r))$ of the core. The cases $r = 0$ (a
+rectangle) and $r = a = b$ (a disc) are included.
 
 \begin{definition}[Uniform gap]\label{def:gap}
 Let $d \ge 0$. A set $O \subseteq \C$ \emph{surrounds} a set $I \subseteq \C$ \emph{with uniform
 gap} $d$ if $O = I^{(d)}$.
 \end{definition}
-
-Definition~\ref{def:gap} says that $O$ contains exactly those points lying within distance $d$ of
-$I$. For compact $I$ this is equivalent to $O = I + \Disc_d$; we use both forms below.
-
-\begin{remark}[Choice of norm]
-The identification of the plane with $\C$ rather than with $\R \times \R$ is deliberate. In
-Mathlib the product $\R \times \R$ carries the supremum norm, under which every ``disc'' is a
-square, every rounded rectangle is a rectangle, and the questions considered here are vacuous.
-\end{remark}
 
 \section{Existence}\label{sec:existence}
 
@@ -213,9 +234,10 @@ For $\rho, \sigma \ge 0$, $\Disc_\rho + \Disc_\sigma = \Disc_{\rho + \sigma}$.
 \end{lemma}
 
 \begin{proof}
-The inclusion $\subseteq$ is the triangle inequality. Conversely, given $\norm{z} \le \rho +
-\sigma$ with $z \ne 0$, write $z = \frac{\rho}{\rho + \sigma} z + \frac{\sigma}{\rho + \sigma} z$;
-the case $z = 0$ or $\rho + \sigma = 0$ is immediate.
+The inclusion $\subseteq$ is the triangle inequality. Conversely, let $\norm{z} \le \rho + \sigma$.
+If $\rho + \sigma = 0$ then $z = 0 = 0 + 0$. Otherwise
+$z = \frac{\rho}{\rho + \sigma} z + \frac{\sigma}{\rho + \sigma} z$, and the two summands have
+norms at most $\rho$ and $\sigma$.
 \end{proof}
 
 \begin{lemma}\label{lem:compact}
@@ -224,7 +246,7 @@ For compact $S \subseteq \C$ and $d \ge 0$, $S^{(d)} = S + \Disc_d$.
 
 \begin{proof}
 If $\dist(z, S) \le d$, the infimum is attained at some $s \in S$ by compactness, and
-$z = s + (z - s)$ with $\norm{z - s} \le d$. The converse is immediate.
+$z = s + (z - s)$ with $\norm{z - s} \le d$. The converse inclusion is immediate.
 \end{proof}
 
 \begin{theorem}[Offset theorem]\label{thm:offset}
@@ -236,55 +258,54 @@ If $(a, b, r)$ is admissible, so is $(a + d, b + d, r + d)$.
 \end{theorem}
 
 \begin{proof}
-$\RR(a, b, r)$ is the sum of two compact sets and hence compact. Observe that
-$\Core(a + d, b + d, r + d) = \Core(a, b, r)$, since $(a + d) - (r + d) = a - r$ and likewise for
-$b$. By Lemma~\ref{lem:compact}, associativity of Minkowski addition, and Lemma~\ref{lem:disc},
+$\RR(a, b, r)$ is a sum of two compact sets and hence compact. Since $(a + d) - (r + d) = a - r$
+and likewise for $b$, we have $\Core(a + d, b + d, r + d) = \Core(a, b, r)$. By
+\Cref{lem:compact}, associativity of Minkowski addition, and \Cref{lem:disc},
 \[
   \RR(a, b, r)^{(d)}
   = \bigl(\Core(a, b, r) + \Disc_r\bigr) + \Disc_d
   = \Core(a, b, r) + \Disc_{r + d}
   = \RR(a + d, b + d, r + d).
 \]
-Admissibility is preserved because $r + d \ge 0$ and $r + d \le a + d$, $r + d \le b + d$.
+Admissibility is preserved because $r + d \ge 0$, $r + d \le a + d$ and $r + d \le b + d$.
 \end{proof}
 
 \section{Uniqueness}\label{sec:uniqueness}
 
-Theorem~\ref{thm:offset} shows that $r + d$ \emph{suffices}. To conclude that it is
-\emph{necessary}, we show that a rounded rectangle, as a subset of the plane, determines its three
-parameters.
+\Cref{thm:offset} shows that the radius $r + d$ suffices. To show that it is necessary, we show
+that a rounded rectangle, as a subset of the plane, determines its three parameters.
 
 \begin{lemma}\label{lem:bounds}
-Let $z \in \RR(a, b, r)$. Then $\abs{\Re_ z} \le a$ and $\abs{\Im_ z} \le b$. If $(a, b, r)$ is
-admissible, then $a$ and $ib$ belong to $\RR(a, b, r)$.
+Let $z \in \RR(a, b, r)$. Then $\abs{\ReOp z} \le a$ and $\abs{\ImOp z} \le b$. If $(a, b, r)$ is
+admissible, then $a \in \RR(a, b, r)$ and $ib \in \RR(a, b, r)$.
 \end{lemma}
 
 \begin{proof}
 Write $z = k + v$ with $k \in \Core(a, b, r)$ and $\norm{v} \le r$. Then
-$\abs{\Re_ z} \le \abs{\Re_ k} + \abs{\Re_ v} \le (a - r) + r$, and similarly for the imaginary
-part. For the second claim, $a = (a - r) + r$ with $a - r \in \Core(a, b, r)$ (using
-$0 \le b - r$) and $r \in \Disc_r$; the case of $ib$ is symmetric.
+$\abs{\ReOp z} \le \abs{\ReOp k} + \abs{\ReOp v} \le (a - r) + r = a$, and similarly for the
+imaginary part. For the second claim, $a = (a - r) + r$, where $a - r \in \Core(a, b, r)$ because
+$0 \le b - r$, and $r \in \Disc_r$. The case of $ib$ is symmetric.
 \end{proof}
 
 \begin{lemma}[The top edge]\label{lem:top}
-Let $(a, b, r)$ be admissible and $t \ge 0$. If $(a - t) + ib \in \RR(a, b, r)$ then $t \ge r$.
-Moreover, $(a - r) + ib \in \RR(a, b, r)$.
+Let $(a, b, r)$ be admissible. Then $(a - r) + ib \in \RR(a, b, r)$. Moreover, if $t \ge 0$ and
+$(a - t) + ib \in \RR(a, b, r)$, then $t \ge r$.
 \end{lemma}
 
 \begin{proof}
-The second claim follows from $(a - r) + ib = \bigl((a - r) + i(b - r)\bigr) + ir$. For the first,
+The first claim follows from $(a - r) + ib = \bigl((a - r) + i(b - r)\bigr) + ir$. For the second,
 suppose $t < r$ and write $(a - t) + ib = k + w$ with $k \in \Core(a, b, r)$ and $\norm{w} \le r$.
-Since $\Re_ k \le a - r$ and $\Im_ k \le b - r$,
+Since $\ReOp k \le a - r$ and $\ImOp k \le b - r$,
 \[
-  \Re_ w = a - t - \Re_ k \ge r - t > 0,
-  \qquad
-  \Im_ w = b - \Im_ k \ge r \ge 0.
+  \ReOp w = a - t - \ReOp k \ge r - t > 0
+  \qquad\text{and}\qquad
+  \ImOp w = b - \ImOp k \ge r \ge 0 .
 \]
-Hence $\norm{w}^2 = (\Re_ w)^2 + (\Im_ w)^2 > r^2$, a contradiction.
+Hence $\norm{w}^2 = (\ReOp w)^2 + (\ImOp w)^2 > r^2$, a contradiction.
 \end{proof}
 
-Lemma~\ref{lem:top} says that the straight part of the top edge ends exactly $r$ short of the
-bounding box. Combined with Lemma~\ref{lem:bounds}, it recovers every parameter from the set.
+\Cref{lem:top} says that the straight part of the top edge ends exactly $r$ short of the bounding
+box. Together with \Cref{lem:bounds}, it recovers every parameter from the set.
 
 \begin{theorem}[Uniqueness of parameters]\label{thm:inj}
 If $(a, b, r)$ and $(a', b', r')$ are admissible and $\RR(a, b, r) = \RR(a', b', r')$, then
@@ -292,82 +313,86 @@ $a = a'$, $b = b'$ and $r = r'$.
 \end{theorem}
 
 \begin{proof}
-By Lemma~\ref{lem:bounds}, $a \in \RR(a', b', r')$ gives $a \le a'$, and symmetrically
-$a' \le a$; likewise $b = b'$. Now $(a - r') + ib \in \RR(a, b, r') = \RR(a, b, r)$ by the second
-part of Lemma~\ref{lem:top}, so $r' \ge r$ by the first part. By symmetry $r = r'$.
+By \Cref{lem:bounds}, $a \in \RR(a', b', r')$ gives $a \le a'$, and symmetrically $a' \le a$;
+likewise $b = b'$. By the first part of \Cref{lem:top},
+$(a - r') + ib \in \RR(a, b, r') = \RR(a, b, r)$, so $r' \ge r$ by the second part. By symmetry,
+$r = r'$.
 \end{proof}
 
-\section{The nested radius theorem}\label{sec:main}
+\section{The Nested Radius Theorem}\label{sec:main}
 
 \begin{theorem}[Nested radius theorem]\label{thm:main}
-Let $(a, b, r)$ and $(A, B, R)$ be admissible and let $d \ge 0$. Then $\RR(A, B, R)$ surrounds
+Let $(a, b, r)$ and $(A, B, R)$ be admissible, and let $d \ge 0$. Then $\RR(A, B, R)$ surrounds
 $\RR(a, b, r)$ with uniform gap $d$ if and only if
 \[
-  A = a + d, \qquad B = b + d, \qquad R = r + d.
+  A = a + d, \qquad B = b + d, \qquad R = r + d .
 \]
 \end{theorem}
 
 \begin{proof}
-By Theorem~\ref{thm:offset}, $\RR(a, b, r)^{(d)} = \RR(a + d, b + d, r + d)$, and the latter
-parameters are admissible. The claim now follows from Theorem~\ref{thm:inj}.
+By \Cref{thm:offset}, $\RR(a, b, r)^{(d)} = \RR(a + d, b + d, r + d)$, and these parameters are
+admissible. The claim follows from \Cref{thm:inj}.
 \end{proof}
 
 \subsection{Corollaries}\label{sec:corollaries}
 
-\begin{corollary}[Outer and inner radius laws]
-Under the hypotheses of Theorem~\ref{thm:main}, if $\RR(A, B, R)$ surrounds $\RR(a, b, r)$ with
-uniform gap $d$, then $R = r + d$ and, equivalently, $r = R - d$.
+\begin{corollary}[Outer and inner radius laws]\label{cor:laws}
+Under the hypotheses of \Cref{thm:main}, if $\RR(A, B, R)$ surrounds $\RR(a, b, r)$ with uniform
+gap $d$, then $R = r + d$, equivalently $r = R - d$.
 \end{corollary}
 
-\begin{corollary}[The equal-radius practice]\label{cor:equal}
+\begin{corollary}[Equal radii]\label{cor:equal}
 Let $(a, b, r)$ and $(A, B, r)$ be admissible and $d \ge 0$. Then $\RR(A, B, r)$ surrounds
 $\RR(a, b, r)$ with uniform gap $d$ if and only if $d = 0$, $A = a$ and $B = b$.
 \end{corollary}
 
 \begin{corollary}[The gap is bounded by the outer radius]\label{cor:clamp}
 If $\RR(A, B, R)$ surrounds some admissible $\RR(a, b, r)$ with uniform gap $d \ge 0$, then
-$d \le R$. Consequently, if $R < d$, there is no admissible inner rounded rectangle around which
+$d \le R$. Consequently, if $R < d$, there is no admissible rounded rectangle around which
 $\RR(A, B, R)$ has uniform gap $d$.
 \end{corollary}
 
 \begin{remark}
-Corollary~\ref{cor:clamp} bears on the convention of~\citet{css3backgrounds}, under which the
-inner radius is $\max(R - d, 0)$. When $R \ge d$ this agrees with Theorem~\ref{thm:main}. When
-$R < d$ the convention yields a sharp inner rectangle, which is the most reasonable available
-choice; Corollary~\ref{cor:clamp} shows that no choice would give a uniform gap.
+\Cref{cor:clamp} bears on the CSS convention~\cite{css3backgrounds} that the inner radius is
+$\max(R - d, 0)$. When $R \ge d$ the convention agrees with \Cref{thm:main}. When $R < d$ it
+yields a rectangle with sharp corners; by \Cref{cor:clamp}, no choice of inner radius would give a
+uniform gap in that case.
 \end{remark}
 
-\begin{example}
+\begin{example}\label{ex:card}
 A card of corner radius $8$ placed with padding $4$ requires a container of corner radius $12$.
-This instance is checked in the formalization (Section~\ref{sec:lean}).
+This instance is checked in the formalization.
 \end{example}
 
-We close the section with a quantitative form of Corollary~\ref{cor:equal}. It is not part of the
-formalization.
+The following proposition quantifies \Cref{cor:equal}. It is not part of the formalization.
 
-\begin{proposition}[Corner swelling]\label{prop:swell}
+\begin{proposition}[Corner gap under equal radii]\label{prop:swell}
 Let $(a, b, r)$ be admissible and $d \ge 0$, and let $p$ be the midpoint of the top-right corner
 arc of $\RR(a + d, b + d, r)$. Then $\dist\bigl(p, \RR(a, b, r)\bigr) = d\sqrt{2}$.
 \end{proposition}
 
 \begin{proof}
 Let $c = (a - r) + i(b - r)$ and $u = (1 + i)/\sqrt{2}$. The top-right arc of the outer shape is
-centred at $c + d(1 + i)$, so $p = c + d(1 + i) + ru$. Every point $k$ of $\Core(a, b, r)$
-satisfies $\Re_ k \le \Re_ c$ and $\Im_ k \le \Im_ c$, so the point of the core nearest to $p$ is
-$c$ itself, and $\dist(p, \Core(a, b, r)) = \norm{d(1 + i) + ru} = d\sqrt{2} + r$. For a set of the
-form $K + \Disc_r$ with $K$ compact, $\dist(z, K + \Disc_r) = \max\bigl(\dist(z, K) - r, 0\bigr)$, which here
-equals $d\sqrt{2}$.
+centred at $c + d(1 + i)$, so $p = c + d(1 + i) + ru$. Every $k \in \Core(a, b, r)$ satisfies
+$\ReOp k \le \ReOp c$ and $\ImOp k \le \ImOp c$, while $p - c$ has nonnegative real and imaginary
+parts; hence $\norm{p - k} \ge \norm{p - c}$ and
+$\dist(p, \Core(a, b, r)) = \norm{d(1 + i) + ru} = d\sqrt{2} + r$. For compact $K$ and $r \ge 0$,
+$\dist(z, K + \Disc_r) = \max\bigl(\dist(z, K) - r, 0\bigr)$, which here equals $d\sqrt{2}$.
 \end{proof}
 
-Thus, when equal radii are used, the gap at each corner is larger than the gap along the edges by
-a factor of $\sqrt{2} \approx 1.414$, independently of $r$.
+Under equal radii, then, the gap along the corner diagonal exceeds the gap along the edges by a
+factor of $\sqrt{2} \approx 1.414$, independently of $r$.
 
 \section{Formalization}\label{sec:lean}
 
-All definitions and results of Sections~\ref{sec:defs}--\ref{sec:main}, with the exception of
-Proposition~\ref{prop:swell}, are formalized in Lean~4 (version 4.36.0) against
-Mathlib (release \texttt{v4.36.0}). The development comprises four files totalling about 340 lines, including
-documentation. The definitions read:
+The development targets Lean~4.36.0 and Mathlib release \lean{v4.36.0}. It is available as
+supplementary material; all statements below refer to commit \lean{5136a15}.
+
+\subsection{Definitions and main statement}
+
+The definitions follow \Cref{def:rr} directly. The notation \lean{s ×ℂ t} is Mathlib's
+\lean{Set.reProdIm}, the set of complex numbers with real part in \lean{s} and imaginary part in
+\lean{t}.
 
 \begin{lstlisting}
 def core (a b r : ℝ) : Set ℂ :=
@@ -382,9 +407,8 @@ structure Admissible (a b r : ℝ) : Prop where
   radius_le_halfHeight : r ≤ b
 \end{lstlisting}
 
-The uniform-gap relation of Definition~\ref{def:gap} is expressed with
-\texttt{Metric.cthickening}, Mathlib's closed thickening of a set in a pseudo-metric space. The main
-theorem is stated as follows.
+The uniform-gap relation of \Cref{def:gap} is expressed with \lean{Metric.cthickening}. The main
+theorem reads:
 
 \begin{lstlisting}
 theorem nested_radius_theorem (h : Admissible a b r) (hd : 0 ≤ d)
@@ -393,35 +417,79 @@ theorem nested_radius_theorem (h : Admissible a b r) (hd : 0 ≤ d)
       A = a + d ∧ B = b + d ∧ R = r + d
 \end{lstlisting}
 
-The proof of Theorem~\ref{thm:offset} reduces, after Lemma~\ref{lem:compact}
-(\texttt{IsCompact.add\_closedBall\_zero}), to associativity of Minkowski addition and
-Lemma~\ref{lem:disc} (\texttt{closedBall\_add\_closedBall}), both available in Mathlib; the
-formal proof is a single rewrite chain. The proof of Theorem~\ref{thm:inj} follows the argument
-of Section~\ref{sec:uniqueness} closely, the only nonlinear step being the inequality
-$(\Re_ w)^2 + (\Im_ w)^2 > r^2$ in Lemma~\ref{lem:top}, which is discharged by
-\texttt{nlinarith}.
+\Cref{tab:map} lists the formal counterpart of each result.
 
-The development contains no \texttt{sorry}. The command \texttt{\#print axioms} reports that
-every theorem depends only on \texttt{propext}, \texttt{Classical.choice} and
-\texttt{Quot.sound}.
+\begin{table}[t]
+\centering
+\small
+\caption{Correspondence between the results of this paper and the formalization.}
+\label{tab:map}
+\begin{tabular}{lll}
+\hline
+Result & Lean name & File \\
+\hline
+\Cref{lem:compact} & \lean{IsCompact.add\_closedBall\_zero} & Mathlib \\
+\Cref{lem:disc} & \lean{closedBall\_add\_closedBall} & Mathlib \\
+\Cref{thm:offset} & \lean{cthickening\_roundedRect}, \lean{Admissible.offset} & \lean{Offset.lean} \\
+\Cref{lem:bounds} & \lean{abs\_re\_le\_of\_mem\_roundedRect} and three others & \lean{Uniqueness.lean} \\
+\Cref{lem:top} & \lean{le\_of\_mem\_roundedRect\_top} and one other & \lean{Uniqueness.lean} \\
+\Cref{thm:inj} & \lean{roundedRect\_inj} & \lean{Uniqueness.lean} \\
+\Cref{thm:main} & \lean{nested\_radius\_theorem} & \lean{Main.lean} \\
+\Cref{cor:laws} & \lean{outer\_radius\_eq}, \lean{inner\_radius\_eq} & \lean{Main.lean} \\
+\Cref{cor:equal} & \lean{equal\_radii\_iff} & \lean{Main.lean} \\
+\Cref{cor:clamp} & \lean{gap\_le\_outer\_radius} & \lean{Main.lean} \\
+\Cref{ex:card} & anonymous \lean{example} & \lean{Main.lean} \\
+\Cref{prop:swell} & not formalized & -- \\
+\hline
+\end{tabular}
+\end{table}
 
-\section{Discussion}
+\subsection{Proofs}
 
-The law $R = r + d$ concerns circular corners and the Euclidean distance. It makes no claim
-about corners built from other curves, such as the superelliptic or ``continuous'' corners used
-in some design systems, for which the outer shape at uniform distance must be computed
-separately. Nor does it address non-uniform padding, in which case the uniform-gap relation of
-Definition~\ref{def:gap} does not apply.
+After \Cref{lem:compact}, the proof of \Cref{thm:offset} is a single rewrite chain using
+associativity of Minkowski addition and \Cref{lem:disc}. The proof of \Cref{thm:inj} follows
+\Cref{sec:uniqueness}. Its only nonlinear step, the inequality
+$(\ReOp w)^2 + (\ImOp w)^2 > r^2$ in \Cref{lem:top}, is discharged by \lean{nlinarith}.
 
-Within its scope, the result is now settled to the standard of a machine-checked proof. We hope
-that it will be useful.
+\subsection{Faithfulness of the formal statement}
 
-\section*{Acknowledgements}
-The formalization was prepared with the assistance of Claude (Anthropic). The author thanks the
-Mathlib community, without whose library the main theorem would have required more than one
-line.
+A formal proof is only as good as the correspondence between its definitions and the informal
+notions they represent. We note the following points.
 
-\bibliographystyle{plainnat}
+\begin{itemize}
+  \item \emph{The norm.} The plane is \lean{ℂ}, whose norm is Euclidean. The product
+        \lean{ℝ × ℝ} would be incorrect: Mathlib equips it with the supremum norm, under which
+        closed balls are squares and every rounded rectangle is a rectangle.
+  \item \emph{The gap relation.} \lean{Metric.cthickening d s} is the set of points whose
+        extended distance to \lean{s} is at most \lean{d}. This matches $S^{(d)}$ in
+        \Cref{def:gap}. Using the closed rather than the open thickening matches the convention
+        that both shapes include their boundaries.
+  \item \emph{Admissibility.} The hypotheses \lean{Admissible} are needed. If $r > a$, the core
+        is empty, so $\RR(a, b, r) = \emptyset$ and the parameters are not determined by the
+        set. If $r < 0$, the disc $\Disc_r$ is empty.
+  \item \emph{Position.} Rounded rectangles are centred at the origin. Since Minkowski sums and
+        thickenings commute with translation, this involves no loss of generality, but the
+        translated statement is not formalized.
+  \item \emph{Trusted base.} The development contains no \lean{sorry}, and
+        \lean{\#print axioms} reports that every theorem depends only on \lean{propext},
+        \lean{Classical.choice} and \lean{Quot.sound}. A continuous-integration job checks this
+        on every commit.
+\end{itemize}
+
+\subsection{Size}
+
+The development has four files totalling 341 lines including documentation: three definitions,
+21 theorems and one example. It builds against a prebuilt Mathlib in under a minute on a laptop.
+
+\section{Conclusion}\label{sec:conclusion}
+
+We have proved that the uniform-gap outer shape of a rounded rectangle of radius $r$ is the
+rounded rectangle of radius $r + d$ and that no other radius yields a uniform gap, and we have
+checked the proofs in Lean~4. The result concerns circular corners and the Euclidean distance. It
+makes no claim about corners built from other curves, such as the superelliptic corners used in
+some design systems, nor about non-uniform padding. Extending the formalization to these cases,
+and to the translated statement noted in \Cref{sec:lean}, is left to future work.
+
 \bibliography{references}
 
 \end{document}
